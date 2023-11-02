@@ -1,15 +1,32 @@
 const express = require("express");
 const dotenv = require("dotenv");
 const cors = require("cors");
-const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb")
+
+const multer = require("multer")
+const fs = require('fs')
+const path = require('path')
 
 const app = express();
 const port = process.env.PORT || 9000;
 
 //Middlewares
 app.use(cors())
-app.use(express.json())
+app.use(express.json({limit: '50mb'}));
+app.use(express.urlencoded({limit: '50mb'}));
 dotenv.config();
+
+
+const storage = multer.diskStorage({
+  destination:(req, file, cb)=>{
+    cb(null, "uploads/")
+  },
+  filename:(req, file, cb)=>{
+    cb(null, file.originalname)
+  },
+})
+
+const upload = multer({storage})
 
 
 //Default Route
@@ -42,12 +59,38 @@ async function run() {
 
     // collections 
     const todosCollection = client.db('todoDB').collection('todos');
+    const usersCollection = client.db('todoDB').collection('users');
 
     //Application Routes
-    //Get Todos
-    app.get("/todos", async(req, res)=>{
+    //Upload file to DB
+    app.post("/signup", async(req, res)=>{
       try {
-        const result = await todosCollection.find().toArray();
+        const user = req.body;
+        console.log(user)
+        const result = await usersCollection.insertOne(user);
+        res.status(200).send({message:"Successfully uploaded"});
+      } catch (error) {
+        res.status(500).json({error:true, message:'There was server side error!'})
+      }
+    })
+
+    //Get valid user from DB
+    app.get("/users/:email", async(req, res)=>{
+      try {
+        const {email} = req.params;
+        const result = await usersCollection.findOne({email:email});
+        res.status(200).send(result);
+      } catch (error) {
+        res.status(500).json({error:true, message:'There was server side error!'})
+      }
+    })
+
+
+    //Get Todos
+    app.get("/todos/:email", async(req, res)=>{
+      try {
+        const {email} = req.params;
+        const result = await todosCollection.find({email:email}).toArray();
         res.status(200).send(result);
       } catch (error) {
         res.status(500).json({error:true, message:'There was server side error!'})
