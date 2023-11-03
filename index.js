@@ -12,8 +12,7 @@ const port = process.env.PORT || 9000;
 
 //Middlewares
 app.use(cors())
-app.use(express.json({limit: '50mb'}));
-app.use(express.urlencoded({limit: '50mb'}));
+app.use(express.json());
 dotenv.config();
 
 
@@ -52,10 +51,10 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    // await client.db("admin").command({ ping: 1 });
+    // console.log("Pinged your deployment. You successfully connected to MongoDB!");
 
     // collections 
     const todosCollection = client.db('todoDB').collection('todos');
@@ -66,7 +65,6 @@ async function run() {
     app.post("/signup", async(req, res)=>{
       try {
         const user = req.body;
-        console.log(user)
         const result = await usersCollection.insertOne(user);
         res.status(200).send({message:"Successfully uploaded"});
       } catch (error) {
@@ -86,11 +84,57 @@ async function run() {
     })
 
 
-    //Get Todos
+    //Get Todos By User Email
     app.get("/todos/:email", async(req, res)=>{
       try {
         const {email} = req.params;
         const result = await todosCollection.find({email:email}).toArray();
+        res.status(200).send(result);
+      } catch (error) {
+        res.status(500).json({error:true, message:'There was server side error!'})
+      }
+    })
+
+    //Get Todos By User Email and Title
+    app.get("/searchByTitle", async(req, res)=>{
+      try {
+        const {email} = req.query;
+        const {title} = req.query;
+        const result = await todosCollection.find({email:email, title:{$regex: new RegExp(title, "i")}}).toArray();
+        res.status(200).send(result);
+      } catch (error) {
+        res.status(500).json({error:true, message:'There was server side error!'})
+      }
+    })
+
+    //Filter Todos By User Email and Title
+    app.get("/filterByComplete", async(req, res)=>{
+      try {
+        const {email} = req.query;
+        const {filterTxt} = req.query;
+        console.log(filterTxt)
+
+        if(filterTxt==="Completed"){
+          const allTodos = await todosCollection.find({email, completed:true}).toArray();
+          res.status(200).send(allTodos);
+        }else if(filterTxt==="Incompleted"){
+          const allTodos = await todosCollection.find({email, completed:false}).toArray();
+          res.status(200).send(allTodos);
+        }else{
+          const allTodos = await todosCollection.find({email}).toArray();
+          res.status(200).send(allTodos);
+        }
+      } catch (error) {
+        res.status(500).json({error:true, message:'There was server side error!'})
+      }
+    })
+
+    //Sort Todos By Ascending or Descending
+    app.get("/sortByTitle", async(req, res)=>{
+      try {
+        const {email} = req.query;
+        const {sortStatus} = req.query;
+        const result = await todosCollection.find({email:email}).sort({title: sortStatus === "ascending" ? 1 : -1}).toArray();
         res.status(200).send(result);
       } catch (error) {
         res.status(500).json({error:true, message:'There was server side error!'})
